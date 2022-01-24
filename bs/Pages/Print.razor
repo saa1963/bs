@@ -1,0 +1,169 @@
+﻿@page "/print"
+
+@using System.Text.RegularExpressions
+@using System.Diagnostics.CodeAnalysis
+@using System.Data.SqlClient
+@using bs.Data
+
+@inject IConfiguration Cfg
+@inject ILogger<New> logger
+@inject IWebHostEnvironment env
+@inject IJSRuntime JS
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<div class="my-3">
+    <Pager @ref="pager" lines="@lines" list="@lst0" 
+        OnChangeLinesCallback="@SetLines">
+    <div class="mt-3">
+        <button class="mr-3" @onclick="@(_ => handlePdf())">PDF</button>
+        <input class="mr-3" type="text" placeholder="заказы через запятую" @onchange="(e) => handleChangeFilter(e)" />
+        <button class="mr-3" @onclick="@(_ => handleFilter())">Фильтр</button>
+    </div>
+    
+    <table class='table table-striped' aria-labelledby="tabelLabel">
+        <thead>
+            <tr>
+                <th>.</th>
+                <th>Заказ</th>
+                <th>Артикул</th>
+                <th>Код</th>
+                <th>Последняя печать</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (PdfQuery o in pager.GetPage())
+            {
+                int id = o.Id;
+                <tr>
+                    <td>
+                        @if (o.Печатать)
+                        {
+                            <input type="checkbox" checked @onchange="@((e) => handleCheck(e, id))" />
+                        }
+                        else
+                        {
+                            <input type="checkbox" @onchange="@((e) => handleCheck(e, id))" />
+                        }
+                    </td>
+                    <td>@o.Заказ</td>
+                    <td>@o.Артикул</td>
+                    <td>@o.Код</td>
+                    <td>@(o.Последняя_печать?.ToString("dd.MM.yyyy") ?? "")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </Pager>
+    <SaModal @ref="samodal"></SaModal>
+</div>
+
+@code {
+    [AllowNull]
+    Pager<PdfQuery> pager;
+    [AllowNull]
+    SaModal samodal;
+    private List<PdfQuery> lst = new();
+    private string filter = "";
+    const string PrintLinesName = "husqvarna.ru.bs.print.lines";
+    [AllowNull]
+    IEnumerable<PdfQuery> lst0;
+    int lines;
+    public Print() { }
+    internal Print(IConfiguration cfg)
+    {
+        Cfg = cfg;
+    }
+    async Task<int> GetLines()
+    {
+        var lines = await localStorage.GetItemAsync<string>(PrintLinesName) ?? "15";
+        return Int32.Parse(lines);
+    }
+    async Task SetLines(int x)
+    {
+        await localStorage.SetItemAsync(PrintLinesName, x.ToString());
+    }
+    protected async override Task OnInitializedAsync()
+    {
+        lines = await GetLines();
+        await RefreshData();
+    }
+    async Task RefreshData()
+    {
+        using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_new")))
+        {
+            cn.Open();
+            lst.Clear();
+            var cmd = new SqlCommand("sp_Mark_RUC_Query", cn);
+            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+            cmd.Parameters.AddWithValue("@type", "select_get_pdf2");
+            using (var dr = await cmd.ExecuteReaderAsync())
+            {
+                int i = 1;
+                while (await dr.ReadAsync())
+                {
+                    var dt_print = dr.GetSqlDateTime(3);
+                    lst.Add(new PdfQuery
+                    {
+                        Id = i,
+                        Заказ = dr.GetString(0),
+                        Артикул = dr.GetString(1),
+                        Код = dr.GetString(2),
+                        Последняя_печать = dt_print.IsNull ? null : dt_print.Value,
+                        Печатать = false
+                    });
+                    i++;
+                }
+            }
+        }
+        lst0 = lst.OrderBy(s => s.Заказ).ThenBy(s => s.Артикул).ThenBy(s => s.Код);
+    }
+
+    private void handleChangeFilter(ChangeEventArgs e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        filter = e.Value?.ToString() ?? "";
+    }
+    private void handleCheck(ChangeEventArgs e, int key)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        var o = lst0.First(s => s.Id == key);
+        o.Печатать = e.Value is null ? throw new NullReferenceException() : (bool)e.Value;
+    }
+    private async void handlePdf()
+    {
+        try
+        {
+            var km = lst0.Where(s => s.Печатать).Select(s => s.Код).ToArray();
+            var lst = Const._SavePdfFromFile(km, Cfg.GetValue<string>("pdfDirectory"), 
+                    Cfg.GetConnectionString("cn_new"),
+                    logger,
+                    env.ContentRootPath,
+                    out List<string> fnames);
+            var fileName = "mark" + DateTime.Now.ToString("yyyy-MM-dd_hh_mm_ss") + ".zip";
+            var zipArray = Const.ZipFiles(fnames);
+            using (var streamRef = new DotNetStreamReference(stream: new MemoryStream(zipArray)))
+            {
+                await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+            }
+        }
+        catch (SaException e)
+        {
+            logger.LogError(e, "");
+            samodal.Open(e.Message);
+        }
+        RefreshData();
+        StateHasChanged();
+    }
+    private void handleFilter()
+    {
+        lst.ForEach(s => s.Печатать = false);
+        lst0 = lst.Where(p =>
+        {
+            if (String.IsNullOrWhiteSpace(filter))
+                return true;
+            else
+                return filter.Split(',').Any(s => new Regex(s.Trim() + "$").IsMatch(p.Заказ));
+        }).OrderBy(s => s.Заказ).ThenBy(s => s.Артикул).ThenBy(s => s.Код);
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,489 @@
+﻿@page "/new"
+
+@attribute [Authorize(Policy = "New")]
+
+@using System.Diagnostics.CodeAnalysis
+@using Microsoft.Extensions.Configuration
+@using System.Data.SqlClient
+@using NLog
+@using System.IO.Compression
+@using System.IO
+@using bs.Data
+
+@inject IConfiguration Cfg
+@inject ILogger<New> logger
+@inject IWebHostEnvironment env;
+@inject IJSRuntime JS
+
+<div class="my-3">
+    <div>
+        <button class="mr-3" @onclick="@(_ => handleStepPrepare())">Заказать</button>
+        <button class="mr-3" @onclick="@(_ => handleStep1())">Шаг 1</button>
+        <button class="mr-3" @onclick="@(_ => handleStep2())">Шаг 2</button>
+        <button class="mr-3" @onclick="@(_ => handleStep3())">Шаг 3</button>
+        <button class="mr-3" @onclick="@(_ => handleStep4())">Шаг 4</button>
+    </div>
+    <table class='table table-striped' aria-labelledby="tabelLabel">
+        <thead>
+            <tr>
+                <th>N заказа</th>
+                <th>Артикул</th>
+                <th>К-во на 4 недели</th>
+                <th>Статус 0</th>
+                <th>Статус 1</th>
+                <th>Статус 2</th>
+                <th>Статус 3</th>
+                <th>Рекомендуется дозаказать</th>
+                <th>Кол-во дозаказать</th>
+                <th>К-во больше 4 недель</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (GetNew o in lst)
+            {
+                int id = o.Id;
+                <tr>
+                <td>@o.Номер_заказа</td>
+                <td>@o.Артикул</td>
+                <td>@o.К_во_на_4_недели.ToString()</td>
+                <td>@o.Статус_0.ToString()</td>
+                <td>@o.Статус_1.ToString()</td>
+                <td>@o.Статус_2.ToString()</td>
+                <td>@o.Статус_3.ToString()</td>
+                <td>@o.Рекомендуется_дозаказать.ToString()</td>
+                <td><input id=@id.ToString() type="number" min="0" value=@o.К_во_дозаказать.ToString() @onchange="@(e => InputQty(e, id))" /></td>
+                <td>@o.К_во_больше_4_недель</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <SaModal @ref="samodal"></SaModal>
+    <SaModalArray @ref="samodalArray"></SaModalArray>
+</div>
+
+
+@code {
+    SaModal? samodal;
+    SaModalArray? samodalArray;
+    private List<GetNew> lst = new();
+    protected override void OnInitialized() => RefreshData();
+    public New() {}
+    internal New(IConfiguration cfg)
+    {
+        Cfg = cfg;
+    }
+    private void RefreshData()
+    {
+        using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_new")))
+        {
+            cn.Open();
+            lst.Clear();
+            var cmd = new SqlCommand("sp_Mark_RUC_Query", cn);
+            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+            cmd.Parameters.AddWithValue("@type", "select_query_km1");
+            using (var dr = cmd.ExecuteReader())
+            {
+                int i = 0;
+                while (dr.Read())
+                {
+                    lst.Add(new GetNew
+                    {
+                        Id = i++,
+                        Номер_заказа = dr.GetString(0),
+                        Артикул = dr.GetString(1),
+                        К_во_на_4_недели = dr.GetInt32(2),
+                        Статус_0 = dr.GetInt32(3),
+                        Статус_1 = dr.GetInt32(4),
+                        Статус_2 = dr.GetInt32(5),
+                        Статус_3 = dr.GetInt32(6),
+                        Рекомендуется_дозаказать = dr.GetInt32(2) + dr.GetInt32(9) - dr.GetInt32(3) - dr.GetInt32(4) - dr.GetInt32(5) - dr.GetInt32(6),
+                        К_во_дозаказать = dr.GetInt32(8),
+                        К_во_больше_4_недель = dr.GetInt32(9)
+                    });
+                }
+                lst = lst.OrderBy(s => s.Номер_заказа).ThenBy(s => s.Артикул).ToList();
+            }
+        }
+    }
+    private void InputQty(ChangeEventArgs e, int key)
+    {
+        if (e != null && e.Value != null && lst != null)
+        {
+            var o = lst.First(s => s.Id == key);
+            o.К_во_дозаказать = Int32.Parse((string)e.Value);
+        }
+    }
+    private void handleStepPrepare()
+    {
+        if (samodal is null) throw new NullReferenceException();
+
+        int successed = 0;
+        var lst1 = lst.Where(s => s.К_во_дозаказать > 0).ToList();
+        foreach (var p in lst1)
+        {
+            if (PrepareOrder(p.Номер_заказа, p.Артикул, p.К_во_дозаказать) == "Ok")
+                successed++;
+        }
+        var mess = $"Из {lst1.Count()} единиц товара \n{successed} переведено в статус 0.\n";
+        logger.LogInformation(mess);
+        samodal.Open(mess);
+        RefreshData();
+        StateHasChanged();
+    }
+    private async void handleStep1()
+    {
+        if (samodal is null) throw new NullReferenceException();
+        var rt = new ApiResponse();
+        try
+        {
+            using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_new")))
+            {
+                var lst2 = new List<InputOrder2>();
+                cn.Open();
+                var cmd = new SqlCommand("sp_Mark_RUC_Query", cn);
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@type", "select_query_km2");
+                using (var dr = cmd.ExecuteReader())
+                {
+                    while (dr.Read())
+                    {
+
+                        lst2.Add(new InputOrder2()
+                        {
+                            article = dr.GetString(0),
+                            gtin = dr.GetString(1),
+                            sn = dr.GetString(2),
+                            tg = dr.GetInt32(3)
+                        });
+                    }
+                }
+                if (lst2.Count == 0)
+                    throw new SaException("Список кодов маркировки в статусе 0 пуст.");
+                var lst =  lst2.GroupBy(s => new { s.article, s.gtin, s.tg })
+                                .Select(group => new InputOrder3() 
+                                { 
+                                    article = group.Key.article, 
+                                    gtin = group.Key.gtin, 
+                                    ordered = group.Count(), 
+                                    tg = group.Key.tg, 
+                                    sn = group.Select(s => s.sn).ToList()
+                                }).ToList();
+                logger.LogInformation($"Из БД получен запрос на КМ " +
+                    $"для {lst.Count} артикулов {String.Join(",", lst.Select(x => x.gtin).ToArray())}");
+                var orders = MakeOrders(lst);
+                logger.LogInformation($"Сформировано {orders.Count()} заказов для отправки в Честный знак");
+                foreach (OrderSn order in orders)
+                {
+                    string s = order.Serialize();
+                    var response = await ProgramHttp_Suz_v2.Post2ApiAsync<OrderResponse, ErrorResponse>(s, order.Url, Cfg);
+                    OrderResponse successObject = response.Item1;
+                    ErrorResponse errorObject = response.Item2;
+                    if (successObject != null)
+                    {
+                        var tr = cn.BeginTransaction();
+                        logger.LogInformation(rt.AddMsg($"Создан заказ {successObject.orderId}"));
+                        cmd = new SqlCommand("sp_Mark_RUC_OrderCreated", cn);
+                        cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                        cmd.Transaction = tr;
+                        foreach (var product in order.products)
+                        {
+                            cmd.Parameters.Clear();
+                            cmd.Parameters.AddWithValue("@orderid", Guid.Parse(successObject.orderId));
+                            cmd.Parameters.AddWithValue("@article", product.article);
+                            cmd.Parameters.AddWithValue("@gtin", product.gtin);
+                            cmd.Parameters.AddWithValue("@available", product.quantity);
+                            cmd.Parameters.AddWithValue("@productgroup", order.ProductGroup);
+                            cmd.Parameters.AddWithValue("@qty", product.quantity);
+                            cmd.ExecuteNonQuery();
+                        }
+                        tr.Commit();
+                    }
+                    else
+                    {
+                        WriteError2(errorObject, rt);
+                    }
+                }
+            }
+            logger.LogInformation("Обработка закончена.");
+            rt.status = 0;
+            samodalArray.Open(rt.errors);
+        }
+        catch (SaException e)
+        {
+            logger.LogInformation(e.Message);
+            rt.status = 1;
+            rt.errors.Add(e.Message);
+            samodalArray.Open(rt.errors);
+        }
+        catch (Exception e)
+        {
+            logger.LogInformation(e, "");
+            rt.status = 2;
+            rt.errors.Add(e.Message);
+            samodalArray.Open(rt.errors);
+        }
+        RefreshData();
+        StateHasChanged();
+    }
+    private async void handleStep2()
+    {
+        if (samodal is null) throw new NullReferenceException();
+        var rt = new ApiResponse();
+        try
+        {
+            //var mark = GetMark(debugOption);
+            using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_new")))
+            {
+                cn.Open();
+                var cmd = new SqlCommand("sp_Mark_RUC_Query", cn);
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@type", "select_for_orders1");
+                var cmd1 = new SqlCommand("sp_Mark_RUC_Query", cn);
+                cmd1.CommandType = System.Data.CommandType.StoredProcedure;
+                using (var dr = cmd.ExecuteReader())
+                {
+                    if (!dr.HasRows)
+                    {
+                        rt.status = 0;
+                        logger.LogInformation(rt.AddMsg("Нет заказов с невыбранными кодами маркировки."));
+                        samodal.Open(rt.ToString());
+                    }
+                    while (dr.Read())
+                    {
+                        var orderid = dr.GetGuid(0);
+                        var gtin = dr.GetString(1);
+                        var productgroup = dr.GetInt32(2);
+                        var (status, error) = await ProgramHttp_Suz_v2.BufferStatusAsync1(productgroup, orderid.ToString(), gtin, Cfg);
+                        if (status == 0)
+                        {
+                            //Const.ProcessMessageResponse($"Заказ {orderid} размещен.", true, ref rt, Logger);
+                            logger.LogInformation(rt.AddMsg($"Заказ {orderid} размещен."));
+                            cmd1.Parameters.Clear();
+                            cmd1.Parameters.AddWithValue("@type", "update_status1");
+                            cmd1.Parameters.AddWithValue("@orderid", orderid);
+                            cmd1.ExecuteNonQuery();
+                        }
+                        else if (status == 1)
+                        {
+                            logger.LogInformation(rt.AddMsg($"Заказ {orderid} отклонен."));
+                            logger.LogInformation(rt.AddMsg(error));
+                            cmd1.Parameters.Clear();
+                            cmd1.Parameters.AddWithValue("@type", "cancel_order");
+                            cmd1.Parameters.AddWithValue("@orderid", orderid);
+                            cmd1.Parameters.AddWithValue("@error", error);
+                            cmd1.ExecuteNonQuery();
+                        }
+                        else if (status == 2)
+                        {
+                            logger.LogInformation(rt.AddMsg($"Заказ {orderid} gtin {gtin}. Данные не готовы. Попробуйте еще."));
+                        }
+                    }
+                    rt.status = 0;
+                    samodalArray.Open(rt.errors);
+                }
+            }
+        }
+        catch (SaException e)
+        {
+            rt.status = 2;
+            logger.LogInformation(rt.AddMsg(e.Message));
+            samodalArray.Open(rt.errors);
+        }
+        catch (Exception e)
+        {
+            rt.status = 3;
+            logger.LogInformation(rt.AddMsg(e.Message));
+            samodalArray.Open(rt.errors);
+        }
+        RefreshData();
+        StateHasChanged();
+    }
+    private async void handleStep3()
+    {
+        if (samodal is null) throw new NullReferenceException();
+
+        var rt = new ApiResponse();
+        try
+        {
+            using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_new")))
+            {
+                cn.Open();
+                var cmd = new SqlCommand("sp_Mark_RUC_Query", cn);
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@type", "select_for_orders");
+                var cmd1 = new SqlCommand("sp_Mark_RUC_SetForOrders", cn);
+                cmd1.CommandType = System.Data.CommandType.StoredProcedure;
+                using (var dr = cmd.ExecuteReader())
+                {
+                    if (!dr.HasRows)
+                    {
+                        logger.LogInformation(rt.AddMsg("Нет заказов с невыбранными кодами маркировки."));
+                        samodal.Open(rt.ToString());
+                    }
+                    while (dr.Read())
+                    {
+                        var orderid = dr.GetGuid(0);
+                        var gtin = dr.GetString(1);
+                        var productgroup = dr.GetInt32(2);
+                        string lastBlockId = "0";
+                        int leftInBuffer;
+                        while ((leftInBuffer = await ProgramHttp_Suz_v2.GetQuantityKmInBufferAsync(productgroup, orderid.ToString(), gtin, Cfg)) > 0)
+                        {
+                            //Const.ProcessMessageResponse($"Запрошены коды маркировки заказ {orderid} GTIN {gtin}. Количество - {leftInBuffer}", true, ref rt, Logger);
+                            logger.LogInformation($"Запрошены коды маркировки заказ {orderid} GTIN {gtin}. Количество - {leftInBuffer}");
+                            var km = await ProgramHttp_Suz_v2.GetKmAsync(productgroup, orderid.ToString(), gtin, leftInBuffer, lastBlockId, Cfg);
+                            if (km == null) break;
+                            //Const.ProcessMessageResponse($"Получены коды маркировки заказ {orderid} GTIN {gtin} Количество - {km.codes.Length}", true, ref rt, Logger);
+                            logger.LogInformation(rt.AddMsg($"Получены коды маркировки заказ {orderid} GTIN {gtin} Количество - {km.codes.Length}"));
+                            foreach (var o in km.codes)
+                            {
+                                cmd1.Parameters.Clear();
+                                cmd1.Parameters.AddWithValue("@orderid", orderid);
+                                cmd1.Parameters.AddWithValue("@gtin", gtin);
+                                cmd1.Parameters.AddWithValue("@km", o);
+                                cmd1.ExecuteNonQuery();
+                            }
+                            lastBlockId = km.blockId;
+                        }
+                    }
+                }
+                rt.status = 0;
+                samodalArray.Open(rt.errors);
+            }
+        }
+        catch (SaException e)
+        {
+            rt.status = 2;
+            logger.LogError(rt.AddMsg(e.Message));
+            samodalArray.Open(rt.errors);
+        }
+        catch (Exception e)
+        {
+            rt.status = 3;
+            logger.LogError(rt.AddMsg(e.Message));
+            samodalArray.Open(rt.errors);
+        }
+        RefreshData();
+        StateHasChanged();
+    }
+    private async void handleStep4()
+    {
+        if (samodal is null) throw new NullReferenceException();
+
+        try
+        {
+            using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_new")))
+            {
+                cn.Open();
+                var km = new List<string>();
+                var cmd = new SqlCommand("sp_Mark_RUC_Query", cn);
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@type", "select_get_pdf4");
+                using (var dr = cmd.ExecuteReader())
+                {
+                    while (dr.Read())
+                    {
+                        km.Add(dr.GetString(0));
+                    }
+                }
+                var lst = Const._SavePdfFromFile(km.ToArray(), Cfg.GetValue<string>("pdfDirectory"), 
+                    Cfg.GetConnectionString("cn_new"),
+                    logger,
+                    env.ContentRootPath,
+                    out List<string> fnames);
+                var fileName = "mark" + DateTime.Now.ToString("yyyy-MM-dd_hh_mm_ss") + ".zip";
+                var zipArray = Const.ZipFiles(fnames);
+                using (var streamRef = new DotNetStreamReference(stream: new MemoryStream(zipArray)))
+                {
+                    await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+                }
+            }
+        }
+        catch (SaException e)
+        {
+            logger.LogError(e, "");
+            samodal.Open(e.Message);
+        }
+        RefreshData();
+        StateHasChanged();
+    }
+    private string PrepareOrder(string ordernum, string article, int qty)
+    {
+        try
+        {
+            using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_new")))
+            {
+                cn.Open();
+                var cmd = new SqlCommand("sp_Mark_RUC_PrepareOrder", cn);
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@ordernum", ordernum);
+                cmd.Parameters.AddWithValue("@article", article);
+                cmd.Parameters.AddWithValue("@qty", qty);
+                cmd.ExecuteNonQuery();
+                return "Ok";
+            }
+        }
+        catch (SaException e)
+        {
+            logger.LogError(e.Message);
+            return e.Message;
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "");
+            return e.Message;
+        }
+    }
+    private void WriteError2(ErrorResponse errorObject, ApiResponse rt)
+    {
+        if (errorObject.fieldErrors != null)
+            foreach (var o in errorObject.fieldErrors)
+            {
+                logger.LogError(rt.AddMsg($"{o.fieldError} {o.fieldName}"));
+            }
+        if (errorObject.globalErrors != null)
+            foreach (var o in errorObject.globalErrors)
+            {
+                logger.LogError(rt.AddMsg($"{o.errorCode} {o.error}"));
+            }
+    }
+    internal IEnumerable<RequestBody> MakeOrders(IEnumerable<InputOrder3> products)
+    {
+        return products.Select(s =>
+            {
+                var order = CreateOrderHeader(s.tg);
+                order.AddProduct(CreateOrderProduct(s.tg, s.article, s.gtin, s.ordered, s.sn));
+                return order;
+            });
+    }
+    private OrderProductSn CreateOrderProduct(int tg, string article, string gtin,
+        int quantity, List<string> sn)
+    {
+        switch (tg)
+        {
+            case 1:
+                return new OrderProductShoesSn(article, gtin, quantity, sn);
+            case 7:
+                return new OrderProductTiresSn(article, gtin, quantity, sn);
+            case 10:
+                return new OrderProductLpSn(article, gtin, quantity, sn);
+            default:
+                throw new SaException("Неизвестная товарная группа.");
+        }
+    }
+    private OrderSn CreateOrderHeader(int tg)
+    {
+        switch (tg)
+        {
+            case 1:
+                return new OrderShoesSn(Cfg);
+            case 7:
+                return new OrderTiresSn(Cfg);
+            case 10:
+                return new OrderLpSn(Cfg);
+            default:
+                throw new SaException("Неизвестная товарная группа.");
+        }
+    }
+}
+

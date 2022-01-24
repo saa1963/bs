@@ -1,0 +1,342 @@
+﻿@page "/withdrawal"
+
+@using System.Diagnostics.CodeAnalysis
+@using System.Data.SqlClient
+@using System.Text.Json
+@using System.Text
+@using bs.Data
+
+@inject IConfiguration Cfg
+@inject ILogger<New> logger
+@inject IWebHostEnvironment env
+
+<div class="my-3">
+    <div>
+        N СЧФ
+        <input class="mr-3" type="text" @onchange="(e) => handleInputInvoice(e)" />
+        <button class="mr-3" @onclick="(_) => handleRefresh()">Обновить</button>
+        <button class="mr-3" @onclick="(_) => handleStep1()">Шаг 1</button>
+        <button class="mr-3" @onclick="(_) => handleStep2()">Шаг 2</button>
+        <button class="mr-3" @onclick="(_) => handleStepReset()">Сброс ошибки</button>
+    </div>
+    <table class='table table-striped' aria-labelledby="tabelLabel">
+        <thead>
+            <tr>
+                <th>N заказа</th>
+                <th>Дата заказа</th>
+                <th>Код покупателя</th>
+                <th>Наименование покупателя</th>
+                <th>Отгружено</th>
+                <th>Статус 0</th>
+                <th>Статус 1</th>
+                <th>Статус 2</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (GetWithrawalQuery o in lst)
+            {
+                <tr>
+                    <td>@o.Номер_заказа</td>
+                    <td>@o.Дата_заказа.ToString("dd.MM.yyyy")</td>
+                    <td>@o.Код_покупателя</td>
+                    <td>@o.Наименование_покупателя</td>
+                    <td>@o.Отгружено.ToString()</td>
+                    <td>@o.Статус_0.ToString()</td>
+                    <td>@o.Статус_1.ToString()</td>
+                    <td>@o.Статус_2.ToString()</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <SaModal @ref="samodal"></SaModal>
+</div>
+
+@code {
+    [AllowNull]
+    SaModal samodal;
+    private string invoice = "";
+    private List<GetWithrawalQuery> lst = new();
+    private string[] sp = new string[0];
+    protected async override Task OnInitializedAsync()
+    {
+        await Task.Run(() =>
+        {
+            var fname = System.IO.Path.Combine(env.ContentRootPath, "excludew.txt");
+            if (System.IO.File.Exists(fname))
+            {
+                var lst = new List<string>();
+                sp = System.IO.File.ReadLines(fname)
+                    .Where(s => !String.IsNullOrWhiteSpace(s) && !s.StartsWith("//") && s.Trim().Length == 31)
+                    .ToArray();
+            }
+        });
+    }
+    private async void handleRefresh()
+    {
+        using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_withdrawal")))
+        {
+            await cn.OpenAsync();
+            var cmd = new SqlCommand("sp_Mark_RUC_WithdrawalQuery", cn);
+            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+            cmd.Parameters.AddWithValue("@type", "select_withdrawal_interface_history");
+            cmd.Parameters.AddWithValue("@invoice", invoice);
+            using (var dr = await cmd.ExecuteReaderAsync())
+            {
+                int i = 1;
+                lst.Clear();
+                while (await dr.ReadAsync())
+                {
+                    lst.Add(new GetWithrawalQuery
+                    {
+                        ID = i,
+                        Номер_заказа = dr.GetString(0),
+                        Дата_заказа = dr.GetDateTime(1),
+                        Код_покупателя = dr.GetString(2),
+                        Наименование_покупателя = dr.GetString(3),
+                        Отгружено = dr.GetInt32(4),
+                        Статус_0 = dr.GetInt32(5),
+                        Статус_1 = dr.GetInt32(6),
+                        Статус_2 = dr.GetInt32(7)
+                    });
+                    i++;
+                }
+                lst = lst.OrderBy(s => s.Номер_заказа).ToList();
+            }
+        }
+        StateHasChanged();
+    }
+    private void handleInputInvoice(ChangeEventArgs e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        invoice = e.Value is null ? "" : (string)e.Value;
+    }
+    private async void handleStep1()
+    {
+        var rt = new ApiResponse();
+        await PutOrderAsync(invoice, rt);
+        samodal.Open(rt.ToString());
+    }
+    private async void handleStep2()
+    {
+        var rt = new ApiResponse();
+        try
+        {
+            var docids = new List<Guid>();
+            using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_withdrawal")))
+            {
+                cn.Open();
+                SqlCommand cmd;
+                cmd = new SqlCommand("dbo.sp_Mark_RUC_WithdrawalQuery", cn);
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@type", "select_withdrawal_kvit");
+                using (var dr = cmd.ExecuteReader())
+                {
+                    while (dr.Read())
+                    {
+                        docids.Add(dr.GetGuid(0));
+                    }
+                }
+                if (docids.Count == 0) throw new SaException("Список идентификатор пуст.");
+                foreach (var o in docids)
+                {
+                    await GetReceiptWithdrawal1(o.ToString(), cn, rt);
+                }
+            }
+            rt.status = 0;
+            rt.AddMsg("Ok");
+            samodal.Open(rt.ToString());
+        }
+        catch (SaException e)
+        {
+            rt.status = 1;
+            logger.LogError(rt.AddMsg(e.Message));
+            samodal.Open(rt.ToString());
+        }
+        catch (Exception e)
+        {
+            rt.status = 2;
+            logger.LogError(rt.AddMsg(e.Message));
+            samodal.Open(rt.ToString());
+        }
+    }
+    private async void handleStepReset()
+    {
+        var rt = new ApiResponse();
+        try
+        {
+            using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_withdrawal")))
+            {
+                cn.Open();
+                SqlCommand cmd;
+                cmd = new SqlCommand("sp_Mark_RUC_WithdrawalQuery", cn);
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@type", "withdrawal_reset");
+                await cmd.ExecuteNonQueryAsync();
+            }
+            rt.status = 0;
+            rt.AddMsg("Ok");
+            samodal.Open(rt.ToString());
+        }
+        catch (SaException e)
+        {
+            rt.status = 1;
+            logger.LogError(rt.AddMsg(e.Message));
+            samodal.Open(rt.ToString());
+        }
+        catch (Exception e)
+        {
+            rt.status = 2;
+            logger.LogError(rt.AddMsg(e.Message));
+            samodal.Open(rt.ToString());
+        }
+    }
+    public async Task PutOrderAsync(string invoice, ApiResponse rt)
+    {
+        try
+        {
+            var os = WithDrawal(invoice);
+            foreach (var o in os)
+            {
+                var (tg, lst, lk_receipt) = o;
+                var js = JsonSerializer.Serialize(lk_receipt, typeof(LK_RECEIPT));
+                var so = Encoding.UTF8.GetBytes(js);
+                var bm = Convert.ToBase64String(so);
+                var sign = HSignManaged.HSign.Sign(so, Cfg.GetValue<string>("nameCert"));
+                var docCreate = new lk_documents_create_request()
+                {
+                    document_format = "MANUAL",
+                    product_document = bm,
+                    signature = Convert.ToBase64String(sign),
+                    type = "LK_RECEIPT"
+                };
+                var resp = await ProgramHttp_TrueApi_v4.Post2TrueApiAsync2
+                    (docCreate, "lk/documents/create?pg=" + Const.dictTg[tg], Cfg);
+                logger.LogInformation(rt.AddMsg($"Создан документ {resp}"));
+                SaveWithdrawal(lst, resp);
+                logger.LogInformation(rt.AddMsg($"ИД документа {resp} сохранен В БД"));
+            }
+            rt.status = 0;
+            rt.AddMsg("Ok");
+        }
+        catch (SaException e)
+        {
+            rt.status = 1;
+            logger.LogError(rt.AddMsg(e.Message));
+        }
+        catch (Exception e)
+        {
+            rt.status = 2;
+            logger.LogError(rt.AddMsg(e.Message));
+        }
+    }
+
+    private List<Tuple<string, List<WithDrawalInput>, LK_RECEIPT>> WithDrawal(string invoice)
+    {
+        var input = new List<WithDrawalInput>();
+        using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_withdrawal")))
+        {
+            cn.Open();
+            SqlCommand cmd;
+            cmd = new SqlCommand("sp_Mark_RUC_WithdrawalQuery", cn);
+            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+            cmd.Parameters.AddWithValue("@type", "select_withdrawal_history");
+            cmd.Parameters.AddWithValue("@invoice", invoice);
+            using (var dr = cmd.ExecuteReader())
+            {
+                while (dr.Read())
+                {
+                    var ndoc = dr.GetString(0);
+                    var ddoc = dr.GetDateTime(1);
+                    var km = dr.GetString(2);
+                    var tg = dr.GetString(3);
+                    var article = dr.GetString(4);
+                    if (sp == null || !sp.Contains(km))
+                    {
+                        input.Add(new WithDrawalInput()
+                        {
+                            ndoc = ndoc,
+                            ddoc = ddoc,
+                            km = km,
+                            tg = tg,
+                            article = article
+                        });
+                    }
+                }
+            }
+            if (input.Count == 0) throw new SaException("Список кодов индентификации пуст.");
+
+            return GetObs(input);
+        }
+    }
+
+    internal List<Tuple<string, List<WithDrawalInput>, LK_RECEIPT>> GetObs(List<WithDrawalInput> input)
+    {
+        var obs = new List<Tuple<string, List<WithDrawalInput>, LK_RECEIPT>>();
+        foreach (var gr in input.GroupBy(s => new { s.ndoc, s.ddoc, s.tg }))
+        {
+            obs.Add(new Tuple<string, List<WithDrawalInput>, LK_RECEIPT>(
+                gr.Key.tg,
+                gr.ToList(),
+                new LK_RECEIPT()
+                {
+                    action = "ENTERPRISE_USE",
+                    action_date = DateTime.Now.ToString("yyyy-MM-dd"),
+                    document_date = gr.Key.ddoc.ToString("yyyy-MM-ddT00:00:00.000Z"),
+                    document_number = gr.Key.ndoc,
+                    document_type = "OTHER",
+                    inn = Cfg.GetValue<string>("inn"),
+                    primary_document_custom_name = "Акт",
+                    products = gr.Select(s => new LK_RECEIPT_PRODUCTS()
+                    {
+                        cis = s.km
+                    }).ToList()
+                }
+                ));
+        }
+        return obs;
+    }
+    private void SaveWithdrawal(List<WithDrawalInput> list, string resp)
+    {
+        using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_withdrawal")))
+        {
+            cn.Open();
+            SqlCommand cmd;
+            cmd = new SqlCommand("sp_Mark_RUC_WithdrawalQuery", cn);
+            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+            foreach (var o in list)
+            {
+                cmd.Parameters.Clear();
+                cmd.Parameters.AddWithValue("@type", "update_withdrawal");
+                cmd.Parameters.AddWithValue("@DocUid", new Guid(resp));
+                cmd.Parameters.AddWithValue("@invoice", o.ndoc);
+                cmd.Parameters.AddWithValue("@invoice_dt", o.ddoc);
+                cmd.Parameters.AddWithValue("@UniqueId", o.km);
+                cmd.Parameters.AddWithValue("@article", o.article);
+                cmd.ExecuteNonQuery();
+            }
+        }
+    }
+    private async Task GetReceiptWithdrawal1(string doc, SqlConnection cn, ApiResponse rt)
+    {
+        var (code, error) = await ProgramHttp_TrueApi_v4.IsAcceptedAsync(doc.ToString(), Cfg, rt);
+        var cmd = new SqlCommand("dbo.sp_Mark_RUC_WithdrawalQuery", cn);
+        cmd.CommandType = System.Data.CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@type", "update_withdrawal_kvit");
+        if (code == 1)
+        {
+            cmd.Parameters.AddWithValue("@status", 1);
+            cmd.Parameters.AddWithValue("@error", "");
+            cmd.Parameters.AddWithValue("@DocUid", doc);
+            cmd.ExecuteNonQuery();
+            logger.LogInformation(rt.AddMsg($"Документ {doc} обработан. Товары выведены из оборота."));
+        }
+        else if (code == 2)
+        {
+            cmd.Parameters.AddWithValue("@status", 2);
+            cmd.Parameters.AddWithValue("@error", error);
+            cmd.Parameters.AddWithValue("@DocUid", doc);
+            cmd.ExecuteNonQuery();
+            logger.LogInformation(rt.AddMsg($"Документ {doc} не обработан."));
+        }
+    }
+}

@@ -1,0 +1,103 @@
+﻿@typeparam TItem
+
+@using System.Diagnostics.CodeAnalysis
+
+    
+    <div>
+        <button disabled="@isDisabledBegin" @onclick="ToBegin">|&lt;</button>
+        <button disabled="@isDisabledPrev" @onclick="Prev">&lt;</button>
+        <button disabled="@isDisabledNext" @onclick="Next">&gt;</button>
+        <button disabled="@isDisabledEnd" @onclick="ToEnd">&gt;|</button>
+        <button @onclick="ToggleIsHidden">&#x2699;</button>
+        <input hidden="@isHidden" type="number" value="@lines" min="1" max="@total" @onchange="(e) => handleChangeLines(e)" />
+        @($"{pageCounter + 1}/{totalPages}")
+    </div>
+    <div>@ChildContent</div>
+
+@code {
+    [Parameter]
+    [AllowNull]
+    public RenderFragment ChildContent { get; set; }
+    int m_lines;
+    [Parameter]
+    public int lines
+    { 
+        get => m_lines; 
+        set
+        {
+            //if (value == 0) throw new ArgumentOutOfRangeException(nameof(lines));
+            m_lines = value;
+        }
+    }
+    [Parameter]
+    [AllowNull]
+    public IEnumerable<TItem> list { get; set; }
+    [Parameter]
+    public EventCallback<int> OnChangeLinesCallback { get; set; }
+
+    public int total => list.Count();
+    public int pageCounter { get; set; } = 0;
+    bool isDisabledBegin{ get; set; }
+    bool isDisabledPrev{ get; set; }
+    bool isDisabledNext{ get; set; }
+    bool isDisabledEnd{ get; set; }
+    bool isHidden { get; set; } = true;
+    protected override Task OnInitializedAsync()
+    {
+        return Task.Run(() =>
+        {
+            VerifyButtons();
+        });
+    }
+    public IEnumerable<TItem> GetPage()
+    {
+        return list.Skip(pageCounter * lines).Take(lines);
+    }
+    void ToggleIsHidden()
+    {
+        isHidden = !isHidden;
+        StateHasChanged();
+    }
+    async void handleChangeLines(ChangeEventArgs e)
+    {
+        int v = Int32.Parse((string?)e.Value ?? throw new NullReferenceException());
+        m_lines = v;
+        await OnChangeLinesCallback.InvokeAsync(v);
+        pageCounter = 0;
+        isHidden = true;
+        StateHasChanged();
+        VerifyButtons();
+    }
+    void ToBegin()
+    {
+        pageCounter = 0;
+        StateHasChanged();
+        VerifyButtons();
+    }
+    void Prev()
+    {
+        pageCounter--;
+        StateHasChanged();
+        VerifyButtons();
+    }
+    void Next()
+    {
+        pageCounter++;
+        StateHasChanged();
+        VerifyButtons();
+    }
+    void ToEnd()
+    {
+        pageCounter = totalPages - 1;
+        StateHasChanged();
+        VerifyButtons();
+    }
+    void VerifyButtons()
+    {
+        isDisabledBegin = total == 0;
+        isDisabledEnd = total == 0;
+        isDisabledPrev = pageCounter == 0;
+        isDisabledNext = (pageCounter + 1) * lines + 1 > total;
+    }
+    int totalPages => (total % lines == 0 ? total / lines - 1 : total / lines) + 1;
+}

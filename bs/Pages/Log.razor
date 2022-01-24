@@ -1,0 +1,115 @@
+﻿@page "/log"
+
+@using System.Diagnostics.CodeAnalysis
+@using NLog
+@using NLog.Targets
+@using System.Globalization
+@using bs.Data
+
+@inject ILogger<New> logger
+
+<div class="container">
+    <div class="row">
+        <div class="my-3">
+            Дата
+            <input type="date" value="@dt.ToString("yyyy-MM-dd")" @onchange="(e) => handleInputDate(e)" />
+        </div>
+        <div class="row m-3 p-3 bg-primary text-white">
+            <div class="col-2">
+                Дата время
+            </div>
+            <div class="col-1">
+                Уровень
+            </div>
+            <div class="col-3">
+                Источник
+            </div>
+            <div class="col-6">
+                Текст
+            </div>
+        </div>
+    </div>
+    <Pager @ref="pager" lines="5" list="@lst">
+        @foreach (GetLog o in pager.GetPage())
+        {
+            <div class="row m-3">
+                <div class="col-2">
+                    @o.Дата
+                </div>
+                <div class="col-1">
+                    @o.Level
+                </div>
+                <div class="col-3 text-break">
+                    @o.Source
+                </div>
+                <div class="col-6 text-break">
+                    @o.Message
+                </div>
+            </div>
+        }
+    </Pager>
+    <SaModal @ref="samodal"></SaModal>
+</div>
+
+
+@code {
+    [AllowNull]
+    Pager<GetLog> pager;
+    [AllowNull]
+    SaModal samodal;
+    private DateTime dt = DateTime.Today;
+    private List<GetLog> lst = new();
+    protected async override Task OnInitializedAsync()
+    {
+        lst = Get();
+    }
+    private async void handleInputDate(ChangeEventArgs e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        dt = e.Value is null ? 
+            throw new NullReferenceException() : 
+            DateTime.Parse((string)e.Value);
+        lst = Get();
+        StateHasChanged();
+    }
+    private List<GetLog> Get()
+    {
+        var rt = new List<GetLog>();
+        try
+        {
+            var fileTarget = (FileTarget)LogManager.Configuration.FindTargetByName("logfile");
+            // Need to set timestamp here if filename uses date. 
+            // For example - filename="${basedir}/logs/${shortdate}/trace.log"
+            var logEventInfo = new LogEventInfo { TimeStamp = dt };
+            string fileName = fileTarget.FileName.Render(logEventInfo);
+            if (!System.IO.File.Exists(fileName))
+                return rt;
+            return System.IO.File.ReadAllLines(fileName).Select((s, i) =>
+            {
+                var mas = s.Split('|');
+                var newLog = new GetLog();
+                newLog.Id = i;
+                if (mas.Length == 4)
+                {
+                    newLog.Дата = mas[0];
+                    newLog.Level = mas[1];
+                    newLog.Source = mas[2];
+                    newLog.Message = mas[3];
+                }
+                else
+                {
+                    newLog.Дата = "";
+                    newLog.Level = "";
+                    newLog.Source = "";
+                    newLog.Message = mas[0];
+                }
+                return newLog;
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex.Message);
+            throw;
+        }
+    }
+}
