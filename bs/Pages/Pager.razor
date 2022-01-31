@@ -18,17 +18,8 @@
     [Parameter]
     [AllowNull]
     public RenderFragment ChildContent { get; set; }
-    int m_lines;
     [Parameter]
-    public int lines
-    { 
-        get => m_lines; 
-        set
-        {
-            //if (value == 0) throw new ArgumentOutOfRangeException(nameof(lines));
-            m_lines = value;
-        }
-    }
+    public int lines { get; set; }
     [Parameter]
     [AllowNull]
     public IEnumerable<TItem> list { get; set; }
@@ -61,7 +52,7 @@
     async void handleChangeLines(ChangeEventArgs e)
     {
         int v = Int32.Parse((string?)e.Value ?? throw new NullReferenceException());
-        m_lines = v;
+        lines = v;
         await OnChangeLinesCallback.InvokeAsync(v);
         pageCounter = 0;
         isHidden = true;
@@ -99,5 +90,5 @@
         isDisabledPrev = pageCounter == 0;
         isDisabledNext = (pageCounter + 1) * lines + 1 > total;
     }
-    int totalPages => (total % lines == 0 ? total / lines - 1 : total / lines) + 1;
+    int totalPages => lines != 0 ? (total % lines == 0 ? total / lines - 1 : total / lines) + 1 : -1;
 }

@@ -75,8 +75,8 @@
     }
     async Task<int> GetLines()
     {
-        var lines = await localStorage.GetItemAsync<string>(PrintLinesName) ?? "15";
-        return Int32.Parse(lines);
+        var ls = await localStorage.GetItemAsync<string>(PrintLinesName) ?? "21";
+        return Int32.Parse(ls);
     }
     async Task SetLines(int x)
     {
@@ -84,10 +84,15 @@
     }
     protected async override Task OnInitializedAsync()
     {
+        RefreshData();
         lines = await GetLines();
-        await RefreshData();
     }
-    async Task RefreshData()
+    //protected override async Task OnAfterRenderAsync(bool firstRender)
+    //{
+    //    lines = await GetLines();
+    //    RefreshData();
+    //}
+    void RefreshData()
     {
         using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_new")))
         {
@@ -96,10 +101,10 @@
             var cmd = new SqlCommand("sp_Mark_RUC_Query", cn);
             cmd.CommandType = System.Data.CommandType.StoredProcedure;
             cmd.Parameters.AddWithValue("@type", "select_get_pdf2");
-            using (var dr = await cmd.ExecuteReaderAsync())
+            using (var dr = cmd.ExecuteReader())
             {
                 int i = 1;
-                while (await dr.ReadAsync())
+                while (dr.Read())
                 {
                     var dt_print = dr.GetSqlDateTime(3);
                     lst.Add(new PdfQuery

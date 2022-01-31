@@ -29,35 +29,38 @@ namespace bs
 
             foreach (var o in lists)
             {
-                Table t1 = new Table(new float[] { Fmm(40f), Fmm(58f) });
-                //Table t1 = new Table(2);
-                t1.UseAllAvailableWidth();
-                t1.SetMargins(0, 0, 0, 0);
-                t1.SetBorder(Border.NO_BORDER);
+                if (o.km != null)
+                {
+                    Table t1 = new Table(new float[] { Fmm(40f), Fmm(58f) });
+                    //Table t1 = new Table(2);
+                    t1.UseAllAvailableWidth();
+                    t1.SetMargins(0, 0, 0, 0);
+                    t1.SetBorder(Border.NO_BORDER);
 
-                Cell c1 = new Cell();
-                c1.Add(new Paragraph("Артикул:"));
-                c1.Add(new Paragraph(o.article));
-                c1.SetVerticalAlignment(VerticalAlignment.MIDDLE);
-                c1.SetHeight(Fmm(73f));
-                c1.SetMargins(0, 0, 0, 0);
-                c1.SetBorder(Border.NO_BORDER);
-                c1.SetPaddingLeft(Fmm(10f));
-                t1.AddCell(c1);
+                    Cell c1 = new Cell();
+                    c1.Add(new Paragraph("Артикул:"));
+                    c1.Add(new Paragraph(o.article));
+                    c1.SetVerticalAlignment(VerticalAlignment.MIDDLE);
+                    c1.SetHeight(Fmm(73f));
+                    c1.SetMargins(0, 0, 0, 0);
+                    c1.SetBorder(Border.NO_BORDER);
+                    c1.SetPaddingLeft(Fmm(10f));
+                    t1.AddCell(c1);
 
-                Cell c2 = new Cell();
-                byte[] im = GetImage(o.km);
-                var imData = iText.IO.Image.ImageDataFactory.CreateBmp(im, false);
-                c2.Add(new iText.Layout.Element.Image(imData));
-                c2.Add(new Paragraph(String.Concat(o.km.TakeWhile(s => s != '\u001D'))));
-                c2.SetMargins(0, 0, 0, 0);
-                c2.SetPaddingRight(Fmm(5));
-                c2.SetVerticalAlignment(VerticalAlignment.MIDDLE);
-                c2.SetBorder(Border.NO_BORDER);
-                c2.SetFontSize(9);
-                t1.AddCell(c2);
+                    Cell c2 = new Cell();
+                    byte[] im = GetImage(o.km);
+                    var imData = iText.IO.Image.ImageDataFactory.CreateBmp(im, false);
+                    c2.Add(new iText.Layout.Element.Image(imData));
+                    c2.Add(new Paragraph(String.Concat(o.km.TakeWhile(s => s != '\u001D'))));
+                    c2.SetMargins(0, 0, 0, 0);
+                    c2.SetPaddingRight(Fmm(5));
+                    c2.SetVerticalAlignment(VerticalAlignment.MIDDLE);
+                    c2.SetBorder(Border.NO_BORDER);
+                    c2.SetFontSize(9);
+                    t1.AddCell(c2);
 
-                doc.Add(t1);
+                    doc.Add(t1);
+                }
             }
             doc.Close();
             return fname;

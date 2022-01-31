@@ -28,8 +28,8 @@ namespace bs
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             return httpClient;
         }
-        private static string _authToken = null;
-        private static DateTime? _authTokenCreated = null;
+        //private static string? _authToken = null;
+        //private static DateTime? _authTokenCreated = null;
         private static async Task<string> AuthenticateMeSuzAsync(IConfiguration cfg)
         {
             return await ProgramHttp_TrueApi_v4._AuthenticateMeAsync(cfg, true);
@@ -39,7 +39,7 @@ namespace bs
             string s = sContent;
             return Encoding.UTF8.GetBytes(s);
         }
-        public static async Task<Tuple<U, T>> Post2ApiAsync<U, T>(string sContent, string url, IConfiguration cfg)
+        public static async Task<Tuple<OrderResponse?, ErrorResponse?>?> Post2ApiAsync(string sContent, string url, IConfiguration cfg)
         {
             var msg = GetContentForSigning(sContent, url);
             var certName = cfg.GetValue<string>("nameCert");
@@ -53,20 +53,29 @@ namespace bs
             if (response.StatusCode == System.Net.HttpStatusCode.OK)
             {
                 var s = await response.Content.ReadAsStringAsync();
-                var rt = JsonSerializer.Deserialize<U>(s);
-                return new Tuple<U, T>(rt, default(T));
+                var rt = JsonSerializer.Deserialize<OrderResponse>(s);
+                if (rt != null)
+                    return new Tuple<OrderResponse?, ErrorResponse?>(rt, null);
+                else
+                    return null;
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
             {
                 var s = await response.Content.ReadAsStringAsync();
-                var rt = JsonSerializer.Deserialize<T>(s);
-                return new Tuple<U, T>(default(U), rt);
+                var rt = JsonSerializer.Deserialize<ErrorResponse>(s);
+                if (rt != null)
+                    return new Tuple<OrderResponse?, ErrorResponse?>(null, rt);
+                else
+                    return null;
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.InternalServerError)
             {
                 var s = await response.Content.ReadAsStringAsync();
-                var rt = JsonSerializer.Deserialize<T>(s);
-                return new Tuple<U, T>(default(U), rt);
+                var rt = JsonSerializer.Deserialize<ErrorResponse>(s);
+                if (rt != null)
+                    return new Tuple<OrderResponse?, ErrorResponse?>(null, rt);
+                else
+                    return null;
             }
             else
             {
@@ -86,33 +95,33 @@ namespace bs
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                var rt = JsonSerializer.Deserialize<BufferStatusResponse>(content);
+                var rt = JsonSerializer.Deserialize<BufferStatusResponse>(content) ?? throw new SaException("");
                 return rt;
             }
             else
                 throw new SaException($"Ошибка вызова.{response.StatusCode} {response.ReasonPhrase}");
         }
-        public static async Task<Tuple<int, string>> BufferStatusAsync1(int productgroup, string orderId, string gtin, IConfiguration cfg)
+        public static async Task<Tuple<int, string?>> BufferStatusAsync1(int productgroup, string orderId, string gtin, IConfiguration cfg)
         {
             var rt = await _BufferStatusAsync(productgroup, orderId, gtin, cfg);
             if (rt.bufferStatus == "PENDING")
             {
                 Logger.Info("Данные не готовы");
-                return new Tuple<int, string>(2, "PENDING");
+                return new Tuple<int, string?>(2, "PENDING");
             }
             else
             {
                 if (rt.bufferStatus == "ACTIVE")
-                    return new Tuple<int, string>(0, "");
+                    return new Tuple<int, string?>(0, "");
                 else if (rt.bufferStatus == "REJECTED")
                 {
                     Logger.Info(rt.rejectionReason);
-                    return new Tuple<int, string>(1, rt.rejectionReason);
+                    return new Tuple<int, string?>(1, rt.rejectionReason);
                 }
                 else
                 {
                     Logger.Info($"Буфер КМ не доступен. Статус {rt.bufferStatus}");
-                    return new Tuple<int, string>(2, rt.bufferStatus);
+                    return new Tuple<int, string?>(2, rt.bufferStatus);
                 }
             }
         }
@@ -149,7 +158,7 @@ namespace bs
                 }
             }
         }
-        public static async Task<GetKmResponse> GetKmAsync(int productgroup, string orderId, string gtin, int qty, string blockId, IConfiguration cfg)
+        public static async Task<GetKmResponse?> GetKmAsync(int productgroup, string orderId, string gtin, int qty, string blockId, IConfiguration cfg)
         {
             string omsId = cfg.GetValue<string>("omsId");
             string url0 = $"/codes?omsId={omsId}&orderId={orderId}&gtin={gtin}&quantity={qty}&lastBlockId={blockId}";
@@ -166,7 +175,7 @@ namespace bs
             else
             {
                 var errorResponse = JsonSerializer.Deserialize<ErrorResponse>(content);
-                WriteError2(errorResponse);
+                if (errorResponse != null) WriteError2(errorResponse);
                 return null;
             }
         }

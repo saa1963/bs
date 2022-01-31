@@ -54,7 +54,7 @@ namespace bs
                 uuid = o.uuid,
                 data = Convert.ToBase64String(signedData)
             };
-            auth_simpleSignIn_response resp = null;
+            auth_simpleSignIn_response? resp = null;
             resp =
                 await AuthenticatePostApiAsync<auth_simpleSignIn_request, auth_simpleSignIn_response>
                     (oContent,
@@ -76,7 +76,7 @@ namespace bs
         {
             return await _AuthenticateMeAsync(cfg, false);
         }
-        private static string _authToken = null;
+        private static string? _authToken = null;
         private static DateTime? _authTokenCreated = null;
         private static async Task<U> AuthenticatePostApiAsync<T, U>(T req, string url, IConfiguration cfg)
         {
@@ -87,7 +87,7 @@ namespace bs
             if (response.StatusCode == System.Net.HttpStatusCode.OK)
             {
                 var s = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<U>(s);
+                return JsonSerializer.Deserialize<U>(s) ?? throw new Exception("Ошибка десериализации объекта.");
             }
             else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
@@ -142,7 +142,7 @@ namespace bs
                     return new Tuple<int, string>(1, "");
                 else if (new List<string>{
                     "CHECKED_NOT_OK",
-                    "PARSE_ERROR"}.Contains(resp.status))
+                    "PARSE_ERROR"}.Contains(resp.status ?? ""))
                 {
                     string defRt = $"Документ {docid} не загружен.";
                     string sRt = "";

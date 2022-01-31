@@ -4,7 +4,7 @@ namespace bs
 {
     public class OrderLpSn : OrderSn
     {
-        private IConfiguration config;
+        private IConfiguration? config;
         [JsonConstructor]
         public OrderLpSn(string contactPerson, string releaseMethodType, string createMethodType)
         {
@@ -22,7 +22,7 @@ namespace bs
         public string contactPerson { get; set; }
         public string releaseMethodType { get; set; }
         public string createMethodType { get; set; }
-        public string productionOrderId { get; set; } = null;
+        public string? productionOrderId { get; set; } = null;
         [JsonIgnore]
         public override int ProductGroup => 10;
         [JsonIgnore]
@@ -31,7 +31,7 @@ namespace bs
         public override string Extention => "lp";
         [JsonIgnore]
         public override string PingUrl => $"lp/ping?omsId={config.GetValue<string>("omsId")}";
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (!(obj is OrderLpSn))
                 return false;

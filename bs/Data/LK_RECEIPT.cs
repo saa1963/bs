@@ -1,16 +1,19 @@
-﻿namespace bs.Data
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace bs.Data
 {
     public class LK_RECEIPT
     {
-        public string action { get; set; }
-        public string action_date { get; set; }
-        public string document_date { get; set; }
-        public string document_number { get; set; }
-        public string document_type { get; set; }
-        public string inn { get; set; }
-        public string primary_document_custom_name { get; set; }
-        public List<LK_RECEIPT_PRODUCTS> products { get; set; }
-        public override bool Equals(object obj)
+        public string? action { get; set; }
+        public string? action_date { get; set; }
+        public string? document_date { get; set; }
+        public string? document_number { get; set; }
+        public string? document_type { get; set; }
+        public string? inn { get; set; }
+        public string? primary_document_custom_name { get; set; }
+        [NotNull]
+        public List<LK_RECEIPT_PRODUCTS>? products { get; set; }
+        public override bool Equals(object? obj)
         {
             if (!(obj is LK_RECEIPT))
                 return false;
@@ -31,8 +34,8 @@
     }
     public class LK_RECEIPT_PRODUCTS
     {
-        public string cis { get; set; }
-        public override bool Equals(object obj)
+        public string? cis { get; set; }
+        public override bool Equals(object? obj)
         {
             if (!(obj is LK_RECEIPT_PRODUCTS))
                 return false;

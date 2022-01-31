@@ -61,16 +61,19 @@
     private List<GetLog> lst = new();
     protected async override Task OnInitializedAsync()
     {
-        lst = Get();
+        await Task.Run(() => { lst = Get(); });
     }
     private async void handleInputDate(ChangeEventArgs e)
     {
-        ArgumentNullException.ThrowIfNull(e);
-        dt = e.Value is null ? 
-            throw new NullReferenceException() : 
-            DateTime.Parse((string)e.Value);
-        lst = Get();
-        StateHasChanged();
+        await Task.Run(() =>
+        {
+            ArgumentNullException.ThrowIfNull(e);
+            dt = e.Value is null ?
+                throw new NullReferenceException() :
+                DateTime.Parse((string)e.Value);
+            lst = Get();
+            StateHasChanged();
+        });
     }
     private List<GetLog> Get()
     {

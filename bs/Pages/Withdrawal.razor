@@ -71,7 +71,7 @@
             }
         });
     }
-    private async void handleRefresh()
+    private async Task handleRefresh()
     {
         using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_withdrawal")))
         {
@@ -115,6 +115,7 @@
         var rt = new ApiResponse();
         await PutOrderAsync(invoice, rt);
         samodal.Open(rt.ToString());
+        await handleRefresh();
     }
     private async void handleStep2()
     {
@@ -158,6 +159,7 @@
             logger.LogError(rt.AddMsg(e.Message));
             samodal.Open(rt.ToString());
         }
+        await handleRefresh();
     }
     private async void handleStepReset()
     {

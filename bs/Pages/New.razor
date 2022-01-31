@@ -11,6 +11,7 @@
 @using bs.Data
 
 @inject IConfiguration Cfg
+[NotNull]
 @inject ILogger<New> logger
 @inject IWebHostEnvironment env;
 @inject IJSRuntime JS
@@ -133,6 +134,7 @@
     private async void handleStep1()
     {
         if (samodal is null) throw new NullReferenceException();
+        if (samodalArray is null) throw new NullReferenceException();
         var rt = new ApiResponse();
         try
         {
@@ -153,13 +155,13 @@
                             article = dr.GetString(0),
                             gtin = dr.GetString(1),
                             sn = dr.GetString(2),
-                            tg = dr.GetInt32(3)
+                            tg = dr[3] is DBNull ? 0 : dr.GetInt32(3)
                         });
                     }
                 }
                 if (lst2.Count == 0)
                     throw new SaException("Список кодов маркировки в статусе 0 пуст.");
-                var lst =  lst2.GroupBy(s => new { s.article, s.gtin, s.tg })
+                var lst =  lst2.GroupBy(s => new { s?.article, s?.gtin, s.tg })
                                 .Select(group => new InputOrder3() 
                                 { 
                                     article = group.Key.article, 
@@ -175,9 +177,14 @@
                 foreach (OrderSn order in orders)
                 {
                     string s = order.Serialize();
-                    var response = await ProgramHttp_Suz_v2.Post2ApiAsync<OrderResponse, ErrorResponse>(s, order.Url, Cfg);
-                    OrderResponse successObject = response.Item1;
-                    ErrorResponse errorObject = response.Item2;
+                    var response = await ProgramHttp_Suz_v2.Post2ApiAsync(s, order.Url, Cfg);
+                    if (response == null)
+                    {
+                        logger.LogInformation(rt.AddMsg("Возвращен результат, который невозможно обработать"));
+                        continue;
+                    }
+                    OrderResponse? successObject = response.Item1;
+                    ErrorResponse? errorObject = response.Item2;
                     if (successObject != null)
                     {
                         var tr = cn.BeginTransaction();
@@ -200,7 +207,7 @@
                     }
                     else
                     {
-                        WriteError2(errorObject, rt);
+                        if (errorObject != null) WriteError2(errorObject, rt);
                     }
                 }
             }
@@ -228,6 +235,7 @@
     private async void handleStep2()
     {
         if (samodal is null) throw new NullReferenceException();
+        if (samodalArray is null) throw new NullReferenceException();
         var rt = new ApiResponse();
         try
         {
@@ -266,7 +274,7 @@
                         else if (status == 1)
                         {
                             logger.LogInformation(rt.AddMsg($"Заказ {orderid} отклонен."));
-                            logger.LogInformation(rt.AddMsg(error));
+                            logger.LogInformation(rt.AddMsg(error ?? ""));
                             cmd1.Parameters.Clear();
                             cmd1.Parameters.AddWithValue("@type", "cancel_order");
                             cmd1.Parameters.AddWithValue("@orderid", orderid);
@@ -301,6 +309,7 @@
     private async void handleStep3()
     {
         if (samodal is null) throw new NullReferenceException();
+        if (samodalArray is null) throw new NullReferenceException();
 
         var rt = new ApiResponse();
         try
@@ -369,6 +378,7 @@
     private async void handleStep4()
     {
         if (samodal is null) throw new NullReferenceException();
+        if (samodalArray is null) throw new NullReferenceException();
 
         try
         {
@@ -407,7 +417,7 @@
         RefreshData();
         StateHasChanged();
     }
-    private string PrepareOrder(string ordernum, string article, int qty)
+    private string PrepareOrder(string? ordernum, string? article, int qty)
     {
         try
         {
@@ -456,8 +466,8 @@
                 return order;
             });
     }
-    private OrderProductSn CreateOrderProduct(int tg, string article, string gtin,
-        int quantity, List<string> sn)
+    private OrderProductSn CreateOrderProduct(int tg, string? article, string? gtin,
+        int quantity, List<string>? sn)
     {
         switch (tg)
         {

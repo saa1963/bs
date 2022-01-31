@@ -16,7 +16,7 @@ namespace bs
             return typeof(OrderProductSn).IsAssignableFrom(objectType);
         }
 
-        public override OrderProductSn Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override OrderProductSn? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             Utf8JsonReader readerClone = reader;
 
@@ -31,7 +31,7 @@ namespace bs
                 throw new JsonException();
             }
 
-            string propertyName = readerClone.GetString();
+            string? propertyName = readerClone.GetString();
             if (propertyName != "templateId")
             {
                 throw new JsonException();
@@ -44,7 +44,7 @@ namespace bs
             }
 
             var templateId = readerClone.GetInt32();
-            OrderProductSn op = templateId switch
+            OrderProductSn? op = templateId switch
             {
                 1 => JsonSerializer.Deserialize<OrderProductShoesSn>(ref reader),
                 7 => JsonSerializer.Deserialize<OrderProductTiresSn>(ref reader),

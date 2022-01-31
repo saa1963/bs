@@ -2,9 +2,9 @@
 {
     public class OrderProductShoesSn : OrderProductSn
     {
-        public string exporterTaxpayerId { get; set; }
+        public string? exporterTaxpayerId { get; set; }
         public OrderProductShoesSn() { }
-        public OrderProductShoesSn(string article, string gtin, int quantity, List<string> sn)
+        public OrderProductShoesSn(string? article, string? gtin, int quantity, List<string>? sn)
         {
             this.article = article;
             this.gtin = gtin;
@@ -13,7 +13,7 @@
             this.templateId = 1;
             this.serialNumbers = sn.ToArray();
         }
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (!(obj is OrderProductShoesSn))
                 return false;
