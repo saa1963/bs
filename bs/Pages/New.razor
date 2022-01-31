@@ -161,13 +161,13 @@
                 }
                 if (lst2.Count == 0)
                     throw new SaException("Список кодов маркировки в статусе 0 пуст.");
-                var lst =  lst2.GroupBy(s => new { s?.article, s?.gtin, s.tg })
+                var lst =  lst2.GroupBy(s => new { s?.article, s?.gtin, s?.tg })
                                 .Select(group => new InputOrder3() 
                                 { 
                                     article = group.Key.article, 
                                     gtin = group.Key.gtin, 
                                     ordered = group.Count(), 
-                                    tg = group.Key.tg, 
+                                    tg = group.Key.tg.HasValue ? group.Key.tg.Value : 0, 
                                     sn = group.Select(s => s.sn).ToList()
                                 }).ToList();
                 logger.LogInformation($"Из БД получен запрос на КМ " +

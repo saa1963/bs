@@ -10,6 +10,7 @@ namespace bs
         public string? gtin { get; set; }
         [NotNull]
         public string? sn { get; set; }
-        public int tg { get; set; }
+        [NotNull]
+        public int? tg { get; set; }
     }
 }
