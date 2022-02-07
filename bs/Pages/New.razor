@@ -11,8 +11,7 @@
 @using bs.Data
 
 @inject IConfiguration Cfg
-[NotNull]
-@inject ILogger<New> logger
+@*@inject ILogger<New> logger*@
 @inject IWebHostEnvironment env;
 @inject IJSRuntime JS
 
@@ -64,6 +63,9 @@
 
 
 @code {
+    [Inject]
+    [NotNull]
+    ILogger<New>? logger { get; set; }
     SaModal? samodal;
     SaModalArray? samodalArray;
     private List<GetNew> lst = new();
@@ -340,8 +342,12 @@
                         {
                             //Const.ProcessMessageResponse($"Запрошены коды маркировки заказ {orderid} GTIN {gtin}. Количество - {leftInBuffer}", true, ref rt, Logger);
                             logger.LogInformation($"Запрошены коды маркировки заказ {orderid} GTIN {gtin}. Количество - {leftInBuffer}");
-                            var km = await ProgramHttp_Suz_v2.GetKmAsync(productgroup, orderid.ToString(), gtin, leftInBuffer, lastBlockId, Cfg);
-                            if (km == null) break;
+                            var (km, errs) = await ProgramHttp_Suz_v2.GetKmAsync(productgroup, orderid.ToString(), gtin, leftInBuffer, lastBlockId, Cfg);
+                            if (km == null)
+                            {
+                                rt.errors.AddRange(errs);
+                                break;
+                            }
                             //Const.ProcessMessageResponse($"Получены коды маркировки заказ {orderid} GTIN {gtin} Количество - {km.codes.Length}", true, ref rt, Logger);
                             logger.LogInformation(rt.AddMsg($"Получены коды маркировки заказ {orderid} GTIN {gtin} Количество - {km.codes.Length}"));
                             foreach (var o in km.codes)

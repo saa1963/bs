@@ -158,7 +158,7 @@ namespace bs
                 }
             }
         }
-        public static async Task<GetKmResponse?> GetKmAsync(int productgroup, string orderId, string gtin, int qty, string blockId, IConfiguration cfg)
+        public static async Task<Tuple<GetKmResponse?, List<string>>> GetKmAsync(int productgroup, string orderId, string gtin, int qty, string blockId, IConfiguration cfg)
         {
             string omsId = cfg.GetValue<string>("omsId");
             string url0 = $"/codes?omsId={omsId}&orderId={orderId}&gtin={gtin}&quantity={qty}&lastBlockId={blockId}";
@@ -168,29 +168,38 @@ namespace bs
             h.DefaultRequestHeaders.Add("clientToken", authToken);
             var response = await h.GetAsync(url);
             var content = await response.Content.ReadAsStringAsync();
+            var errs = new List<string>();
             if (response.IsSuccessStatusCode)
             {
-                return JsonSerializer.Deserialize<GetKmResponse>(content);
+                var rt = JsonSerializer.Deserialize<GetKmResponse>(content);
+                return Tuple.Create(rt, errs);
             }
             else
             {
                 var errorResponse = JsonSerializer.Deserialize<ErrorResponse>(content);
-                if (errorResponse != null) WriteError2(errorResponse);
-                return null;
+                if (errorResponse != null)
+                {
+                    errs = WriteError2(errorResponse);
+                }
+                return Tuple.Create<GetKmResponse?, List<string>>(null, errs);
             }
         }
-        public static void WriteError2(ErrorResponse errorObject)
+        public static List<string> WriteError2(ErrorResponse errorObject)
         {
+            var rt = new List<string>();
             if (errorObject.fieldErrors != null)
                 foreach (var o in errorObject.fieldErrors)
                 {
                     Logger.Error($"{o.fieldError} {o.fieldName}");
+                    rt.Add($"{o.fieldError} {o.fieldName}");
                 }
             if (errorObject.globalErrors != null)
                 foreach (var o in errorObject.globalErrors)
                 {
                     Logger.Error($"{o.errorCode} {o.error}");
+                    rt.Add($"{o.errorCode} {o.error}");
                 }
+            return rt;
         }
     }
 }
