@@ -26,6 +26,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="DetachedSignLib.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="micross.ttf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

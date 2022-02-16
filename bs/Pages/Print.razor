@@ -81,17 +81,14 @@
     async Task SetLines(int x)
     {
         await localStorage.SetItemAsync(PrintLinesName, x.ToString());
+        lines = x;
+        await InvokeAsync(StateHasChanged);
     }
     protected async override Task OnInitializedAsync()
     {
         RefreshData();
         lines = await GetLines();
     }
-    //protected override async Task OnAfterRenderAsync(bool firstRender)
-    //{
-    //    lines = await GetLines();
-    //    RefreshData();
-    //}
     void RefreshData()
     {
         using (var cn = new SqlConnection(Cfg.GetConnectionString("cn_new")))

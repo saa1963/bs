@@ -203,7 +203,7 @@
                 var js = JsonSerializer.Serialize(lk_receipt, typeof(LK_RECEIPT));
                 var so = Encoding.UTF8.GetBytes(js);
                 var bm = Convert.ToBase64String(so);
-                var sign = HSignManaged.HSign.Sign(so, Cfg.GetValue<string>("nameCert"));
+                var sign = HSignManaged.HSign.Sign(so, Cfg.GetValue<string>("nameCert"), Cfg.GetValue<string>("nameCertSurname"));
                 var docCreate = new lk_documents_create_request()
                 {
                     document_format = "MANUAL",

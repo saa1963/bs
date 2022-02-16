@@ -13,6 +13,7 @@ namespace HSignManaged
             IntPtr signMessage,
             out int sm_len,
             string cert,
+            string surname,
             StringBuilder errMessage,
             int em_len);
         [DllImport("DetachedSignLib.dll", CharSet = CharSet.Unicode, SetLastError = true, CallingConvention = CallingConvention.Cdecl)]
@@ -22,21 +23,22 @@ namespace HSignManaged
             IntPtr signMessage,
             out int sm_len,
             string cert,
+            string surname,
             StringBuilder errMessage,
             int em_len);
 
         private const int errorBufferSize = 1024;
-        public delegate int DSign(byte[] message, int cbmess_len, IntPtr signMessage, out int sm_len, string cert, StringBuilder errMessage, int em_len);
-        public static byte[] Sign(byte[] message, string cert)
+        public delegate int DSign(byte[] message, int cbmess_len, IntPtr signMessage, out int sm_len, string cert, string surname, StringBuilder errMessage, int em_len);
+        public static byte[] Sign(byte[] message, string cert, string surname)
         {
-            return Sign_(message, cert, SignDetached);
+            return Sign_(message, cert, surname, SignDetached);
         }
-        public static byte[] AttachedSign(byte[] message, string cert)
+        public static byte[] AttachedSign(byte[] message, string cert, string surname)
         {
-            return Sign_(message, cert, SignAttached);
+            return Sign_(message, cert, surname, SignAttached);
         }
 
-        public static byte[] Sign_(byte[] message, string cert, DSign dSign)
+        public static byte[] Sign_(byte[] message, string cert, string surname, DSign dSign)
         {
             IntPtr signMessagePtr = IntPtr.Zero;
             StringBuilder errorMessage = new StringBuilder(errorBufferSize);
@@ -48,6 +50,7 @@ namespace HSignManaged
                 signMessagePtr,
                 out sm_len,
                 cert,
+                surname,
                 errorMessage,
                 errorMessage.Capacity);
 
@@ -61,6 +64,7 @@ namespace HSignManaged
                     signMessagePtr,
                     out sm_len,
                     cert,
+                    surname,
                     errorMessage,
                     errorMessage.Capacity);
                 if (res == 1)

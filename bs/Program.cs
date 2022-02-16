@@ -22,20 +22,21 @@ try
     builder.WebHost.UseUrls("http://*:6005");
 
     // Add services to the container.
-    builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
-       .AddNegotiate();
+    //builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
+    //   .AddNegotiate();
 
-    builder.Services.AddAuthorization(options =>
-    {
-    // By default, all incoming requests will be authorized according to the default policy.
-    options.FallbackPolicy = options.DefaultPolicy;
-        options.AddPolicy("New", policy =>
-                          policy.RequireClaim("permission", "MarkNew"));
-        options.AddPolicy("Put", policy =>
-                        policy.RequireClaim("permission", "MarkPut"));
-        options.AddPolicy("Withdrawal", policy =>
-                        policy.RequireClaim("permission", "MarkWithdrawal"));
-    });
+    //builder.Services.AddAuthorization(options =>
+    //{
+    //// By default, all incoming requests will be authorized according to the default policy.
+    //options.FallbackPolicy = options.DefaultPolicy;
+    //    options.AddPolicy("New", policy =>
+    //                      policy.RequireClaim("permission", "MarkNew"));
+    //    options.AddPolicy("Put", policy =>
+    //                    policy.RequireClaim("permission", "MarkPut"));
+    //    options.AddPolicy("Withdrawal", policy =>
+    //                    policy.RequireClaim("permission", "MarkWithdrawal"));
+    //});
+    //builder.Services.AddSingleton<ValidateAuthentication>();
 
     builder.Services.AddScoped<IClaimsTransformation, ClaimsTransformer>(claimFactory);
 
@@ -69,8 +70,10 @@ try
 
     app.UseRouting();
 
-    app.UseAuthentication();
-    app.UseAuthorization();
+    
+    //app.UseAuthentication();
+    //app.UseAuthorization();
+    //app.UseMiddleware<ValidateAuthentication>();
 
     app.MapBlazorHub();
     app.MapFallbackToPage("/_Host");

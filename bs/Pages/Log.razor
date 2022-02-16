@@ -7,14 +7,15 @@
 @using bs.Data
 
 @inject ILogger<New> logger
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
 
-<div class="container">
-    <div class="row">
-        <div class="my-3">
+<div class="container-fluid">
+    <div class="row mx-0">
+        <div class="my-1">
             Дата
             <input type="date" value="@dt.ToString("yyyy-MM-dd")" @onchange="(e) => handleInputDate(e)" />
         </div>
-        <div class="row m-3 p-3 bg-primary text-white">
+        <div class="row my-3 p-3 bg-primary text-white">
             <div class="col-2">
                 Дата время
             </div>
@@ -29,10 +30,11 @@
             </div>
         </div>
     </div>
-    <Pager @ref="pager" lines="5" list="@lst">
+    <Pager @ref="pager" lines="@lines" list="@lst" 
+        OnChangeLinesCallback="@SetLines">
         @foreach (GetLog o in pager.GetPage())
         {
-            <div class="row m-3">
+            <div class="row my-3">
                 <div class="col-2">
                     @o.Дата
                 </div>
@@ -57,23 +59,34 @@
     Pager<GetLog> pager;
     [AllowNull]
     SaModal samodal;
+    int lines;
+    const string PrintLinesName = "husqvarna.ru.bs.log.lines";
     private DateTime dt = DateTime.Today;
     private List<GetLog> lst = new();
     protected async override Task OnInitializedAsync()
     {
-        await Task.Run(() => { lst = Get(); });
+        lst = Get(); 
+        lines = await GetLines();
+    }
+    async Task<int> GetLines()
+    {
+        var ls = await localStorage.GetItemAsync<string>(PrintLinesName) ?? "10";
+        return Int32.Parse(ls);
+    }
+    async Task SetLines(int x)
+    {
+        await localStorage.SetItemAsync(PrintLinesName, x.ToString());
+        lines = x;
+        await InvokeAsync(StateHasChanged);
     }
     private async void handleInputDate(ChangeEventArgs e)
     {
-        await Task.Run(() =>
-        {
-            ArgumentNullException.ThrowIfNull(e);
-            dt = e.Value is null ?
-                throw new NullReferenceException() :
-                DateTime.Parse((string)e.Value);
-            lst = Get();
-            StateHasChanged();
-        });
+        ArgumentNullException.ThrowIfNull(e);
+        dt = e.Value is null ?
+            throw new NullReferenceException() :
+            DateTime.Parse((string)e.Value);
+        lst = Get();
+        await InvokeAsync(StateHasChanged);
     }
     private List<GetLog> Get()
     {

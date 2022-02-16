@@ -16,10 +16,10 @@ namespace DetachedSignLinNS
 		BYTE* signMessage = nullptr;
 		DWORD sm_len;
 		WCHAR errMessage[1024];
-		if (result = SignDetached(pbMessage, cbMessage, signMessage, &sm_len, L"ÎÎÎ \"ÕÓÑÊÂÀĞÍÀ\"", errMessage, 1024) == 0)
+		if (result = SignDetached(pbMessage, cbMessage, signMessage, &sm_len, L"ÎÎÎ \"ÕÓÑÊÂÀĞÍÀ\"", L"Ìàêàğåíêî", errMessage, 1024) == 0)
 		{
 			signMessage = new BYTE[sm_len];
-			if (result = SignDetached(pbMessage, cbMessage, signMessage, &sm_len, L"ÎÎÎ \"ÕÓÑÊÂÀĞÍÀ\"", errMessage, 1024) != 1)
+			if (result = SignDetached(pbMessage, cbMessage, signMessage, &sm_len, L"ÎÎÎ \"ÕÓÑÊÂÀĞÍÀ\"", L"Ìàêàğåíêî", errMessage, 1024) != 1)
 			{
 				FAIL();
 			}

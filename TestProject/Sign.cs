@@ -14,7 +14,7 @@ namespace TestProject
             try
             {
                 byte[] buffer = Encoding.UTF8.GetBytes("Î ñêîëüêî íàì îòêðûòèé ÷óäíûõ, ãîòîâèò ïðîñâåùåíüÿ äóõ!");
-                byte[] signedMessage = HSign.Sign(buffer, "ÎÎÎ \"ÕÓÑÊÂÀÐÍÀ\"");
+                byte[] signedMessage = HSign.Sign(buffer, "ÎÎÎ \"ÕÓÑÊÂÀÐÍÀ\"", "Ìàêàðåíêî");
                 Assert.IsTrue(signedMessage.Length > 0);
             }
             catch(Exception e)

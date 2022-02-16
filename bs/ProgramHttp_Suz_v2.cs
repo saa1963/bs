@@ -43,7 +43,8 @@ namespace bs
         {
             var msg = GetContentForSigning(sContent, url);
             var certName = cfg.GetValue<string>("nameCert");
-            var signedData = Convert.ToBase64String(HSignManaged.HSign.Sign(msg, certName));
+            var surName = cfg.GetValue<string>("nameCertSurname");
+            var signedData = Convert.ToBase64String(HSignManaged.HSign.Sign(msg, certName, surName));
             var authToken = await AuthenticateMeSuzAsync(cfg);
             var h = GetHttpClientSuz(cfg);
             h.DefaultRequestHeaders.Add("X-Signature", signedData);

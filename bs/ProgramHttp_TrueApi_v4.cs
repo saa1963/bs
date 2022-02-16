@@ -48,7 +48,7 @@ namespace bs
             {
                 throw new SaException("Запрос auth/key не возвратил данные");
             }
-            var signedData = HSignManaged.HSign.AttachedSign(Encoding.UTF8.GetBytes(o.data), cfg.GetValue<string>("nameCert"));
+            var signedData = HSignManaged.HSign.AttachedSign(Encoding.UTF8.GetBytes(o.data), cfg.GetValue<string>("nameCert"), cfg.GetValue<string>("nameCertSurname"));
             var oContent = new auth_simpleSignIn_request()
             {
                 uuid = o.uuid,
