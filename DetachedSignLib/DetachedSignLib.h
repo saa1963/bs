@@ -9,8 +9,8 @@
 
 extern "C" DETACHEDSIGNLIB_API
 DWORD SignDetached(BYTE * message, DWORD cbmess_len,
-    BYTE * signMessage, DWORD * sm_len, LPCWSTR cert, LPCWSTR surname, LPWSTR errMessage, DWORD em_len);
+    BYTE * signMessage, DWORD * sm_len, BYTE *thumbprint, LPWSTR errMessage, DWORD em_len);
 
 extern "C" DETACHEDSIGNLIB_API
 DWORD SignAttached(BYTE * message, DWORD cbmess_len,
-    BYTE * signMessage, DWORD * sm_len, LPCWSTR cert, LPCWSTR surname, LPWSTR errMessage, DWORD em_len);
+    BYTE * signMessage, DWORD * sm_len, BYTE *thumbprint, LPWSTR errMessage, DWORD em_len);

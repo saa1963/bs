@@ -12,8 +12,7 @@ namespace HSignManaged
             int cbmess_len,
             IntPtr signMessage,
             out int sm_len,
-            string cert,
-            string surname,
+            byte[] thumbprint,
             StringBuilder errMessage,
             int em_len);
         [DllImport("DetachedSignLib.dll", CharSet = CharSet.Unicode, SetLastError = true, CallingConvention = CallingConvention.Cdecl)]
@@ -22,24 +21,31 @@ namespace HSignManaged
             int cbmess_len,
             IntPtr signMessage,
             out int sm_len,
-            string cert,
-            string surname,
+            byte[] thumbprint,
             StringBuilder errMessage,
             int em_len);
 
         private const int errorBufferSize = 1024;
-        public delegate int DSign(byte[] message, int cbmess_len, IntPtr signMessage, out int sm_len, string cert, string surname, StringBuilder errMessage, int em_len);
-        public static byte[] Sign(byte[] message, string cert, string surname)
+        private const int sha1Length = 20;
+        public delegate int DSign(byte[] message, int cbmess_len, IntPtr signMessage, out int sm_len, byte[] thumbprint, StringBuilder errMessage, int em_len);
+        public static byte[] Sign(byte[] message, string sthumbprint)
         {
-            return Sign_(message, cert, surname, SignDetached);
+            return Sign_(message, sthumbprint, SignDetached);
         }
-        public static byte[] AttachedSign(byte[] message, string cert, string surname)
+        public static byte[] AttachedSign(byte[] message, string sthumbprint)
         {
-            return Sign_(message, cert, surname, SignAttached);
+            return Sign_(message, sthumbprint, SignAttached);
         }
 
-        public static byte[] Sign_(byte[] message, string cert, string surname, DSign dSign)
+        private static byte[] Sign_(byte[] message, string sthumbprint, DSign dSign)
         {
+            if (sthumbprint.Length != sha1Length * 2) return null;
+            var thumbprint = new byte[sha1Length];
+            for (int i = 0; i < sha1Length; i++)
+            {
+                thumbprint[i] = Byte.Parse(sthumbprint.Substring(i * 2, 2), System.Globalization.NumberStyles.AllowHexSpecifier);
+            }
+
             IntPtr signMessagePtr = IntPtr.Zero;
             StringBuilder errorMessage = new StringBuilder(errorBufferSize);
             int sm_len;
@@ -49,8 +55,7 @@ namespace HSignManaged
                 message.Length,
                 signMessagePtr,
                 out sm_len,
-                cert,
-                surname,
+                thumbprint,
                 errorMessage,
                 errorMessage.Capacity);
 
@@ -63,8 +68,7 @@ namespace HSignManaged
                     message.Length,
                     signMessagePtr,
                     out sm_len,
-                    cert,
-                    surname,
+                    thumbprint,
                     errorMessage,
                     errorMessage.Capacity);
                 if (res == 1)

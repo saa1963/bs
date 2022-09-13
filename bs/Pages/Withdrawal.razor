@@ -203,7 +203,7 @@
                 var js = JsonSerializer.Serialize(lk_receipt, typeof(LK_RECEIPT));
                 var so = Encoding.UTF8.GetBytes(js);
                 var bm = Convert.ToBase64String(so);
-                var sign = HSignManaged.HSign.Sign(so, Cfg.GetValue<string>("nameCert"), Cfg.GetValue<string>("nameCertSurname"));
+                var sign = HSignManaged.HSign.Sign(so, Cfg.GetValue<string>("certThumbprint"));
                 var docCreate = new lk_documents_create_request()
                 {
                     document_format = "MANUAL",
@@ -281,7 +281,7 @@
                 gr.ToList(),
                 new LK_RECEIPT()
                 {
-                    action = "ENTERPRISE_USE",
+                    action = "OWN_USE",
                     action_date = DateTime.Now.ToString("yyyy-MM-dd"),
                     document_date = gr.Key.ddoc.ToString("yyyy-MM-ddT00:00:00.000Z"),
                     document_number = gr.Key.ndoc,

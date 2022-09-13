@@ -42,9 +42,8 @@ namespace bs
         public static async Task<Tuple<OrderResponse?, ErrorResponse?>?> Post2ApiAsync(string sContent, string url, IConfiguration cfg)
         {
             var msg = GetContentForSigning(sContent, url);
-            var certName = cfg.GetValue<string>("nameCert");
-            var surName = cfg.GetValue<string>("nameCertSurname");
-            var signedData = Convert.ToBase64String(HSignManaged.HSign.Sign(msg, certName, surName));
+            var certThumbprint = cfg.GetValue<string>("certThumbprint");
+            var signedData = Convert.ToBase64String(HSignManaged.HSign.Sign(msg, certThumbprint));
             var authToken = await AuthenticateMeSuzAsync(cfg);
             var h = GetHttpClientSuz(cfg);
             h.DefaultRequestHeaders.Add("X-Signature", signedData);

@@ -4,17 +4,17 @@
 #define MAX_SIZE_CERT_NAME 1024
 
 static PCCERT_CONTEXT
-FindCertificate3(const WCHAR* CertSearchString, const WCHAR* Sn)
+FindCertificate3(BYTE* thumbprint)
 {
     PCCERT_CONTEXT capiCertificate = NULL;
     WCHAR certname[MAX_SIZE_CERT_NAME] = { 0 };
     HCERTSTORE hStore;
     DWORD dwFlag;
 
-     //for (int i = 0; i < 2; i++)
-    //{
-        //if (i == 0) dwFlag = CERT_SYSTEM_STORE_CURRENT_USER;
-        //else dwFlag = CERT_SYSTEM_STORE_LOCAL_MACHINE;
+    for (int i = 0; i < 2; i++)
+    {
+        if (i == 0) dwFlag = CERT_SYSTEM_STORE_LOCAL_MACHINE;
+        else dwFlag = CERT_SYSTEM_STORE_LOCAL_MACHINE;
         dwFlag = CERT_SYSTEM_STORE_CURRENT_USER;
         hStore = CertOpenStore(CERT_STORE_PROV_SYSTEM_W,
             X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
@@ -23,41 +23,25 @@ FindCertificate3(const WCHAR* CertSearchString, const WCHAR* Sn)
 
         if (hStore != nullptr)
         {
+            CRYPT_INTEGER_BLOB cib;
+            cib.cbData = 20;
+            cib.pbData = thumbprint;
 
-            CERT_RDN_VALUE_BLOB certRdnValueBlob;
-            certRdnValueBlob.cbData = wcslen(CertSearchString) * sizeof(WCHAR);
-            certRdnValueBlob.pbData = (BYTE*)CertSearchString;
-
-            CERT_RDN_VALUE_BLOB certRdnValueBlob2;
-            certRdnValueBlob2.cbData = wcslen(Sn) * sizeof(WCHAR);
-            certRdnValueBlob2.pbData = (BYTE*)Sn;
-
-            CERT_RDN_ATTR ara[2];
-
-            //CERT_RDN_ATTR certRdnAttr;
-            ara[0].pszObjId = (LPSTR)szOID_COMMON_NAME;
-            ara[0].Value = certRdnValueBlob;
-            ara[0].dwValueType = CERT_RDN_UTF8_STRING;
-
-            //CERT_RDN_ATTR certRdnAttr2;
-            ara[1].pszObjId = (LPSTR)szOID_SUR_NAME;
-            ara[1].Value = certRdnValueBlob2;
-            ara[1].dwValueType = CERT_RDN_UTF8_STRING;
-
-            CERT_RDN certRdn;
-            certRdn.cRDNAttr = 2;
-            certRdn.rgRDNAttr = ara;
             capiCertificate = CertFindCertificateInStore(hStore,
-                X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, CERT_UNICODE_IS_RDN_ATTRS_FLAG,
-                CERT_FIND_SUBJECT_ATTR, &certRdn, NULL);
+                X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0,
+                CERT_FIND_SHA1_HASH, &cib, NULL);
 
             if ((NULL == capiCertificate) || CertVerifyTimeValidity(NULL, capiCertificate->pCertInfo) != 0)
             {
                 capiCertificate = NULL;
                 CertCloseStore(hStore, 0);
             }
+            else
+            {
+                break;
+            }
         }
-    //}
+    }
     return capiCertificate;
 }
 
@@ -75,9 +59,9 @@ static LPCWSTR HandleError(LPCWSTR custMsg, WCHAR* errmsg, DWORD errBuffer_len)
 }
 
 DWORD _Sign(BYTE* message, DWORD cbmess_len,
-    BYTE* signMessage, DWORD* sm_len, LPCWSTR cert, LPCWSTR surname, LPWSTR errMessage, DWORD em_len, BOOL Detached)
+    BYTE* signMessage, DWORD* sm_len, BYTE* thumbprint, LPWSTR errMessage, DWORD em_len, BOOL Detached)
 {
-    PCCERT_CONTEXT certContext = FindCertificate3(cert, surname);
+    PCCERT_CONTEXT certContext = FindCertificate3(thumbprint);
     if (certContext != nullptr)
     {
         CRYPT_OBJID_BLOB hashParam;
@@ -154,13 +138,13 @@ DWORD _Sign(BYTE* message, DWORD cbmess_len,
 }
 
 DWORD SignDetached(BYTE* message, DWORD cbmess_len,
-    BYTE* signMessage, DWORD* sm_len, LPCWSTR cert, LPCWSTR surname, LPWSTR errMessage, DWORD em_len)
+    BYTE* signMessage, DWORD* sm_len, BYTE *thumbprint, LPWSTR errMessage, DWORD em_len)
 {
-    return _Sign(message, cbmess_len, signMessage, sm_len, cert, surname, errMessage, em_len, TRUE);
+    return _Sign(message, cbmess_len, signMessage, sm_len, thumbprint, errMessage, em_len, TRUE);
 }
 
 DWORD SignAttached(BYTE* message, DWORD cbmess_len,
-    BYTE* signMessage, DWORD* sm_len, LPCWSTR cert, LPCWSTR surname, LPWSTR errMessage, DWORD em_len)
+    BYTE* signMessage, DWORD* sm_len, BYTE* thumbprint, LPWSTR errMessage, DWORD em_len)
 {
-    return _Sign(message, cbmess_len, signMessage, sm_len, cert, surname, errMessage, em_len, FALSE);
+    return _Sign(message, cbmess_len, signMessage, sm_len, thumbprint, errMessage, em_len, FALSE);
 }

@@ -104,8 +104,8 @@
     <PostBuildEvent>
       <Command>md $(TargetDir)..\..\bs
 copy /y $(TargetPath) $(TargetDir)..\..\bs
-md $(TargetDir)..\..\bs\bin\x86\Debug\net6.0
-copy /y $(TargetPath) $(TargetDir)..\..\bs\bin\x86\Debug\net6.0
+md $(TargetDir)..\..\bs\bin\x86\$(Configuration)\net6.0
+copy /y $(TargetPath) $(TargetDir)..\..\bs\bin\x86\$(Configuration)\net6.0
 md $(TargetDir)..\..\SignLibTest\$(Configuration)
 copy /y $(TargetPath) $(TargetDir)..\..\SignLibTest\$(Configuration)
 md $(TargetDir)..\..\TestProject\bin\$(PlatformTarget)\$(Configuration)\net6.0
@@ -135,7 +135,13 @@ copy /y $(TargetPath) $(TargetDir)..\..\TestProject\bin\$(PlatformTarget)\$(Conf
     </Link>
     <PostBuildEvent>
       <Command>md $(TargetDir)..\..\bs
-copy /y $(TargetPath) $(TargetDir)..\..\bs</Command>
+copy /y $(TargetPath) $(TargetDir)..\..\bs
+md $(TargetDir)..\..\bs\bin\x86\$(Configuration)\net6.0
+copy /y $(TargetPath) $(TargetDir)..\..\bs\bin\x86\$(Configuration)\net6.0
+md $(TargetDir)..\..\SignLibTest\$(Configuration)
+copy /y $(TargetPath) $(TargetDir)..\..\SignLibTest\$(Configuration)
+md $(TargetDir)..\..\TestProject\bin\$(PlatformTarget)\$(Configuration)\net6.0
+copy /y $(TargetPath) $(TargetDir)..\..\TestProject\bin\$(PlatformTarget)\$(Configuration)\net6.0</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
